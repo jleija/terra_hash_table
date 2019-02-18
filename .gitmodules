@@ -1,0 +1,3 @@
+[submodule "external_dependencies/tommyds"]
+	path = external_dependencies/tommyds
+	url = https://github.com/amadvance/tommyds.git

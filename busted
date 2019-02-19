@@ -1,0 +1,9 @@
+#!/bin/bash
+
+export LUA_PATH="/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;$LUA_PATH"
+export LUA_CPATH="/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;$LUA_CPATH"
+
+export TERRA_PATH=`echo "$LUA_PATH" | sed 's/.lua/.t/g'`
+export TERRA_PATH="$TERRA_PATH;./src/?.t"
+
+busted --lua=terra --loaders=terra $@

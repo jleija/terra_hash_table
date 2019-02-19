@@ -32,6 +32,18 @@ describe("hash table", function()
         assert.is.equal(2, instance():size())
     end)
 
+    it("puts and removes a key-value pair", function()
+        instance():put(4, 44)
+        assert.is.equal(1, instance():size())
+        assert.is.equal(44, instance():get(4).value)
+
+        local pair = instance():del(4)
+        assert.is.equal(4, pair.key)
+        assert.is.equal(44, pair.value)
+        assert.is.falsy(instance():get(4))
+        assert.is.truthy(instance():is_empty())
+    end)
+
     it("puts and gets a string key and value", function()
         --local mm = require("mm")
         --mm(rawstring)

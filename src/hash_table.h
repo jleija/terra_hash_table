@@ -24,3 +24,9 @@ void* hash_table_get(
     void* key, 
     uint64_t key_hash);
 
+void* hash_table_del(
+    hash_table* ht, 
+    comparison_function compare, 
+    void* key, 
+    uint64_t key_hash);
+

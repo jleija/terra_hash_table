@@ -156,5 +156,15 @@ return function(key_type, value_type)
         return key_value_obj
     end
 
+    terra hash_table:del(key : key_type) : &pair
+        var key_hash = key_hash_fn(key)
+        var key_value_obj = [&pair](ht_lib.hash_table_del(
+                                        &self.ht,
+                                        compare_fn,
+                                        &key,
+                                        key_hash))
+        return key_value_obj
+    end
+
     return hash_table, pair
 end

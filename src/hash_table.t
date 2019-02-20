@@ -1,6 +1,3 @@
---local mm = require("mm")
---mm(rawstring)
-
 local std = terralib.includec("stdlib.h")
 local str = terralib.includec("string.h")
 local c = terralib.includec("stdio.h")
@@ -19,26 +16,15 @@ local function get_comparison_fn(terra_type)
     end
     if terra_type:isstruct() then
         return terra(arg : &opaque, key : &opaque) : int
-           return str.strncmp(arg, key, sizeof(terra_type))
-        end
-    end
-    if terra_type:isarray() then
-        if terra_type.type.name == "uint8" then
-            return terra(arg : &opaque, key : &opaque) : int
-               return str.strncmp(arg, key, terra_type.N)
-            end
-        else
-            error("Array type not supported: " .. terra_type.type.name 
-                    .. "[" .. terra_type.N .. "]")
+           return str.memcmp(arg, key, sizeof(terra_type))
         end
     end
     if terra_type:isintegral() or terra_type:isfloat() then
         return terra(arg : &opaque, key : &opaque) : int
             return (@[&terra_type](arg)) ^ (@[&terra_type](key))
         end
-    else
-        error("unsuported terra type: " .. tostring(terra_type.name))
     end
+    error("unsuported terra type: " .. tostring(terra_type.name))
 end
 
 local function get_size_fn(terra_type)
@@ -138,7 +124,6 @@ return function(key_type, value_type)
 
     terra hash_table:get(key : key_type) : &key_value_pair
         var key_hash = key_hash_fn(key)
-        --c.printf("gettin' with hash 0x%lx\n", key_hash)
         var node = [&hash_node](ht_lib.hash_table_get(
                                         &self.ht,
                                         compare_fn,

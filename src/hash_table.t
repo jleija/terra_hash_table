@@ -91,10 +91,14 @@ local function get_key_hash_fn(terra_type)
 end
 
 return function(key_type, value_type)
-    local struct pair {
+    local struct key_value_pair {
         key : key_type
         value : value_type
-        node : ht_lib.hash_node
+    }
+
+    local struct hash_node {
+    	pair : key_value_pair
+        ht_node : ht_lib.hash_node
     }
     
     local struct hash_table {
@@ -122,37 +126,42 @@ return function(key_type, value_type)
     end
 
     terra hash_table:put(key : key_type, value : value_type)
-        var key_value_obj : &pair = [&pair](std.malloc(sizeof(pair)))
-        key_value_obj.key = key_copy_fn(&key)
-        key_value_obj.value = value_copy_fn(&value)
+        var node : &hash_node = [&hash_node](std.malloc(sizeof(hash_node)))
+        node.pair.key = key_copy_fn(&key)
+        node.pair.value = value_copy_fn(&value)
         var key_hash = key_hash_fn(key)
         ht_lib.hash_table_put( &self.ht, 
-                               &key_value_obj.node, 
-                               key_value_obj, 
+                               &node.ht_node, 
+                               node, 
                                key_hash)
     end
 
-    terra hash_table:get(key : key_type) : &pair
+    terra hash_table:get(key : key_type) : &key_value_pair
         var key_hash = key_hash_fn(key)
         --c.printf("gettin' with hash 0x%lx\n", key_hash)
-        var key_value_obj = [&pair](ht_lib.hash_table_get(
+        var node = [&hash_node](ht_lib.hash_table_get(
                                         &self.ht,
                                         compare_fn,
                                         &key,
                                         key_hash))
-        return key_value_obj
-    end
+        if node == nil then
+            return nil
+        end
+            return &node.pair
+        end
 
     terra hash_table:del(key : key_type)
         var key_hash = key_hash_fn(key)
-        var key_value_obj = [&pair](ht_lib.hash_table_del(
+        var node = [&hash_node](ht_lib.hash_table_del(
                                         &self.ht,
                                         compare_fn,
                                         &key,
                                         key_hash))
-	key_delete_fn(key_value_obj.key)
-	value_delete_fn(key_value_obj.value)
+        -- TODO: implement policy where the user owns the memory management
+        -- should manual memory management be the default???
+        key_delete_fn(node.pair.key)
+        value_delete_fn(node.pair.value)
     end
 
-    return hash_table, pair
+    return hash_table, key_value_pair
 end

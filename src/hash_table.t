@@ -94,7 +94,6 @@ return function(key_type, value_type)
     local struct pair {
         key : key_type
         value : value_type
-        padding : uint8[100]
         node : ht_lib.hash_node
     }
     

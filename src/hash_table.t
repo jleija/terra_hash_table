@@ -54,14 +54,14 @@ end
 
 local function get_copy_fn(terra_type)
     if terra_type.name == "rawstring" then
-        return terra(value : terra_type)
-            var copy : terra_type = [terra_type](std.malloc(str.strlen(value) + 1))
-            str.strcpy(copy, value)
+        return terra(value : &terra_type)
+            var copy : terra_type = [terra_type](std.malloc(str.strlen(@value) + 1))
+            str.strcpy(copy, @value)
             return copy
         end
     end
-    return terra(v : terra_type)
-        return v
+    return terra(v : &terra_type)
+        return @v
     end
 end
 
@@ -124,8 +124,8 @@ return function(key_type, value_type)
 
     terra hash_table:put(key : key_type, value : value_type)
         var key_value_obj : &pair = [&pair](std.malloc(sizeof(pair)))
-        key_value_obj.key = key_copy_fn(key)
-        key_value_obj.value = value_copy_fn(value)
+        key_value_obj.key = key_copy_fn(&key)
+        key_value_obj.value = value_copy_fn(&value)
         var key_hash = key_hash_fn(key)
         ht_lib.hash_table_put( &self.ht, 
                                &key_value_obj.node, 

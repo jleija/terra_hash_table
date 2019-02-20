@@ -65,16 +65,13 @@ local function get_copy_fn(terra_type)
     end
 end
 
-local function get_assignment_fn(terra_type)
+local function get_delete_fn(terra_type)
     if terra_type.name == "rawstring" then
-        return terra(a : &terra_type, b : terra_type)
-            @a = [terra_type](std.malloc(str.strlen(b) + 1))
-            str.strcpy(@a, b)
+        return terra(value : terra_type)
+	    std.free(value)
         end
     end
-    return terra(a : &terra_type, b : terra_type)
-       @a = b
-    end
+    return terra(v : terra_type) end
 end
 
 local function get_key_hash_fn(terra_type)
@@ -107,10 +104,10 @@ return function(key_type, value_type)
 
     local compare_fn = get_comparison_fn(key_type)
     local size_fn = get_size_fn(key_type)
-    --local key_assignment_fn = get_assignment_fn(key_type)
     local key_copy_fn = get_copy_fn(key_type)
-    --local value_assignment_fn = get_assignment_fn(value_type)
+    local key_delete_fn = get_delete_fn(key_type)
     local value_copy_fn = get_copy_fn(value_type)
+    local value_delete_fn = get_delete_fn(value_type)
     local key_hash_fn = get_key_hash_fn(key_type)
 
     terra hash_table:init()
@@ -127,22 +124,13 @@ return function(key_type, value_type)
 
     terra hash_table:put(key : key_type, value : value_type)
         var key_value_obj : &pair = [&pair](std.malloc(sizeof(pair)))
-        --c.printf("assigning1\n")
         key_value_obj.key = key_copy_fn(key)
-        --key_assignment_fn(&key_value_obj.key, key)
-        --c.printf("assigned '%s'\n", key_value_obj.key)
-        --c.printf("assigning2\n")
-        --value_assignment_fn(&key_value_obj.value, value)
         key_value_obj.value = value_copy_fn(value)
-        --c.printf("assigned '%s'\n", key_value_obj.value)
-        --c.printf("hashing\n")
         var key_hash = key_hash_fn(key)
-        --c.printf("puttin' on hash 0x%lx\n", key_hash)
         ht_lib.hash_table_put( &self.ht, 
                                &key_value_obj.node, 
                                key_value_obj, 
                                key_hash)
-        --c.printf("done puttin'\n")
     end
 
     terra hash_table:get(key : key_type) : &pair
@@ -156,14 +144,15 @@ return function(key_type, value_type)
         return key_value_obj
     end
 
-    terra hash_table:del(key : key_type) : &pair
+    terra hash_table:del(key : key_type)
         var key_hash = key_hash_fn(key)
         var key_value_obj = [&pair](ht_lib.hash_table_del(
                                         &self.ht,
                                         compare_fn,
                                         &key,
                                         key_hash))
-        return key_value_obj
+	key_delete_fn(key_value_obj.key)
+	value_delete_fn(key_value_obj.value)
     end
 
     return hash_table, pair

@@ -130,12 +130,14 @@ describe("hash table for strings to structs", function()
     end)
 end)
 
-describe("insertion and removal of elements", function()
+describe("typical use cases", function()
+    local str_int_map = hash_table(rawstring, int)
+    local instance
+
+    before_each(function() instance = str_int_map.new() end)
+    after_each(function() str_int_map.delete(instance) end)
+
     it("can put, get and del multiple times with the same key", function()
-        local str_int_map = hash_table(rawstring, int)
-
-        local instance = str_int_map.new()
-
         instance:put("x", 1)
         instance:put("x", 2)
         assert.is.equal(1, instance:get("x").value)
@@ -144,15 +146,24 @@ describe("insertion and removal of elements", function()
         assert.is.equal(2, instance:get("x").value)
         instance:del("x")
         assert.is.falsy(instance:get("x"))
+        str_int_map.delete(instance)
     end)
-end)
 
-describe("element count", function()
+    it("has same usage in terra and in lua", function()
+        local terra put( key: str_int_map.key_type, value : str_int_map.value_type)
+            instance:put(key, value)
+        end
+
+        local terra get( key: str_int_map.key_type)
+            return instance:get(key).value
+        end
+
+        put("one", 1)
+        assert.is.equal(1, get("one"))
+        instance:del("one")
+    end)
+
     it("should return the count of inserted elements", function()
-        local str_int_map = hash_table(rawstring, int)
-
-        local instance = str_int_map.new()
-
         assert.is.equal(0, instance:size())
         instance:put("one", 1)
         assert.is.equal(1, instance:size())
@@ -164,24 +175,20 @@ describe("element count", function()
         assert.is.equal(1, instance:size())
         instance:del("two")
         assert.is.equal(0, instance:size())
-        str_int_map.delete(instance)
     end)
 end)
 
-
 describe("memory usage", function()
-    local str_str_map = hash_table(rawstring, rawstring)
-
-    local instance
-    before_each(function() instance = str_str_map.new() end)
-    after_each(function() str_str_map.delete(instance) end)
-
     it("should reclaim memory when items are removed", function()
+        local str_str_map = hash_table(rawstring, rawstring)
+        local instance = str_str_map.new()
+
         local original_bytes = instance:memory_usage()
         instance:put("one", "uno")
         assert.is.truthy(instance:memory_usage() > original_bytes)
         instance:del("one")
         assert.is.equal(original_bytes, instance:memory_usage())
+        str_str_map.delete(instance)
     end)
 end)
 

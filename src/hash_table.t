@@ -148,5 +148,22 @@ return function(key_type, value_type)
         value_delete_fn(node.pair.value)
     end
 
-    return hash_table, key_value_pair
+    local terra new() : &hash_table
+        var instance = [&hash_table](std.malloc(sizeof(hash_table)))
+        instance:init()
+        return instance
+    end
+
+    local terra delete(instance : &hash_table) 
+        std.free(instance)
+    end
+
+    return {
+        hash_type = hash_table,
+        pair_type = key_value_pair,
+        key_type = key_type,
+        value_type = value_type,
+        new = new,
+        delete = delete
+    }
 end

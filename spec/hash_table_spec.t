@@ -197,17 +197,70 @@ describe("typical use cases", function()
     end)
 end)
 
-describe("memory usage", function()
-    it("should reclaim memory when items are removed", function()
-        local str_str_map = hash_table(rawstring, rawstring)
-        local instance = str_str_map.new()
+describe("memory usage, custom allocator", function()
+    local std = terralib.includec("stdlib.h")
 
+    local allocations_count = global(int, 0)
+    local deallocations_count = global(int, 0)
+
+    local terra alloc(n : int)
+        allocations_count = allocations_count + 1
+        return std.malloc(n)
+    end
+
+    local terra dealloc(p : &opaque)
+        deallocations_count = deallocations_count + 1
+        std.free(p)
+    end
+
+    local str_str_map = hash_table(rawstring, rawstring, {
+                                   alloc_fn = alloc,
+                                   dealloc_fn = dealloc
+                                 })
+
+    local instance = str_str_map.new()
+
+    before_each(function() 
+                    allocations_count:set(0)
+                    deallocations_count:set(0)
+                    instance = str_str_map.new() 
+                end)
+    after_each(function() 
+                    str_str_map.delete(instance) 
+                    assert.is.equal(allocations_count:get(),
+                                    deallocations_count:get())
+               end)
+
+    it("should reclaim memory when items are removed", function()
         local original_bytes = instance:memory_usage()
         instance:put("one", "uno")
         assert.is.truthy(instance:memory_usage() > original_bytes)
         instance:del("one")
         assert.is.equal(original_bytes, instance:memory_usage())
-        str_str_map.delete(instance)
+    end)
+    it("should dealloc as much as alloc, simple case", function()
+        instance:put("a", "A")
+        instance:del("a")
+    end)
+    it("should dealloc as much as alloc", function()
+        instance:put("a", "A")
+        instance:del("a")
+        instance:put("a", "A")
+        instance:put("a", "AA")
+        instance:put("a", "AAA")
+        instance:put("b", "B")
+        instance:del("a")
+        instance:put("b", "BB")
+        instance:del("a")
+        instance:del("b")
+        instance:del("b")
+        instance:del("a")
+    end)
+    it("should should not dealloc already deleted keys", function()
+        instance:put("a", "A")
+        instance:del("a")
+        instance:del("a")
+        instance:del("a")
     end)
 end)
 

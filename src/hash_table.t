@@ -32,34 +32,38 @@ local function get_size_fn(terra_type)
     end
 end
 
-local function get_copy_fn(terra_type)
-    if terra_type.name == "rawstring" then
-        return terra(value : &terra_type)
-            var copy : terra_type = [terra_type](std.malloc(str.strlen(@value) + 1))
-            str.strcpy(copy, @value)
-            return copy
-        end
-    end
-    return terra(v : &terra_type)
-        return @v
-    end
-end
-
-local function get_delete_fn(terra_type)
-    if terra_type.name == "rawstring" then
-        return terra(value : terra_type)
-	    std.free(value)
-        end
-    end
-    return terra(v : terra_type) end
-end
-
-return function(key_type, value_type)
+return function(key_type, value_type, options)
+    options = options or {}
     terralib.includepath = terralib.includepath 
                            .. ";external_dependencies/tommyds/tommyds"
 
     local ht_lib = terralib.includec("src/hash_table.h")
     terralib.linklibrary("bin/hash_table.so")
+
+    local alloc_fn = options.alloc_fn or std.malloc
+    local dealloc_fn = options.dealloc_fn or std.free
+
+    local function get_copy_fn(terra_type)
+        if terra_type.name == "rawstring" then
+            return terra(value : &terra_type)
+                var copy : terra_type = [terra_type](alloc_fn(str.strlen(@value) + 1))
+                str.strcpy(copy, @value)
+                return copy
+            end
+        end
+        return terra(v : &terra_type)
+            return @v
+        end
+    end
+
+    local function get_delete_fn(terra_type)
+        if terra_type.name == "rawstring" then
+            return terra(value : terra_type)
+            dealloc_fn(value)
+            end
+        end
+        return terra(v : terra_type) end
+    end
 
     local function get_key_hash_fn(terra_type)
         if terra_type.name == "rawstring" then
@@ -91,13 +95,13 @@ return function(key_type, value_type)
         ht : ht_lib.hash_table
     }
 
-    local compare_fn = get_comparison_fn(key_type)
-    local size_fn = get_size_fn(key_type)
-    local key_copy_fn = get_copy_fn(key_type)
-    local key_delete_fn = get_delete_fn(key_type)
-    local value_copy_fn = get_copy_fn(value_type)
-    local value_delete_fn = get_delete_fn(value_type)
-    local key_hash_fn = get_key_hash_fn(key_type)
+    local compare_fn = options.compare_fn or get_comparison_fn(key_type)
+    local size_fn = options.size_fn or get_size_fn(key_type)
+    local key_copy_fn = options.key_copy_fn or get_copy_fn(key_type)
+    local key_delete_fn = options.key_delete_fn or get_delete_fn(key_type)
+    local value_copy_fn = options.value_copy_fn or get_copy_fn(value_type)
+    local value_delete_fn = options.value_delete_fn or get_delete_fn(value_type)
+    local key_hash_fn = options.key_hash_fn or get_key_hash_fn(key_type)
 
     terra hash_table:init()
         ht_lib.hash_table_init(&self.ht)
@@ -116,7 +120,7 @@ return function(key_type, value_type)
     end
 
     terra hash_table:put(key : key_type, value : value_type)
-        var node : &hash_node = [&hash_node](std.malloc(sizeof(hash_node)))
+        var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
         node.pair.key = key_copy_fn(&key)
         node.pair.value = value_copy_fn(&value)
         var key_hash = key_hash_fn(key)
@@ -159,19 +163,19 @@ return function(key_type, value_type)
         if node ~= nil then
             key_delete_fn(node.pair.key)
             value_delete_fn(node.pair.value)
-            std.free(node)
+            dealloc_fn(node)
         end
     end
 
     local terra new() : &hash_table
-        var instance = [&hash_table](std.malloc(sizeof(hash_table)))
+        var instance = [&hash_table](alloc_fn(sizeof(hash_table)))
         instance:init()
         return instance
     end
 
     local terra delete(instance : &hash_table) 
         ht_lib.hash_table_done(&instance.ht)
-        std.free(instance)
+        dealloc_fn(instance)
     end
 
     local terra pair(node : &ht_lib.hash_node)

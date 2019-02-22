@@ -36,6 +36,12 @@ void* hash_table_get( hash_table* ht, comparison_function compare, void* key, ui
 {
   return tommy_hashlin_search(ht, compare, key, key_hash);
 }
+
+hash_node* hash_table_bucket( hash_table* ht, uint64_t key_hash)
+{
+  return tommy_hashlin_bucket(ht, key_hash);
+}
+
 void* hash_table_del( hash_table* ht, comparison_function compare, void* key, uint64_t key_hash)
 {
   return tommy_hashlin_remove(ht, compare, key, key_hash);

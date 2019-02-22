@@ -2,12 +2,6 @@ local std = terralib.includec("stdlib.h")
 local str = terralib.includec("string.h")
 local c = terralib.includec("stdio.h")
 
-terralib.includepath = terralib.includepath 
-                       .. ";external_dependencies/tommyds/tommyds"
-
-local ht_lib = terralib.includec("src/hash_table.h")
-terralib.linklibrary("bin/hash_table.so")
-
 local function get_comparison_fn(terra_type)
     if terra_type.name == "rawstring" then
         return terra( a : &opaque, b : &opaque) : int
@@ -60,30 +54,36 @@ local function get_delete_fn(terra_type)
     return terra(v : terra_type) end
 end
 
-local function get_key_hash_fn(terra_type)
-    if terra_type.name == "rawstring" then
+return function(key_type, value_type)
+    terralib.includepath = terralib.includepath 
+                           .. ";external_dependencies/tommyds/tommyds"
+
+    local ht_lib = terralib.includec("src/hash_table.h")
+    terralib.linklibrary("bin/hash_table.so")
+
+    local function get_key_hash_fn(terra_type)
+        if terra_type.name == "rawstring" then
+            return terra(key : terra_type)
+                return ht_lib.hash_table_hashing_fn(
+                                       key, 
+                                       str.strlen(key))
+            end
+        end
         return terra(key : terra_type)
+            -- TODO: get proper hash_fn for integral/float types
             return ht_lib.hash_table_hashing_fn(
-                                   key, 
-                                   str.strlen(key))
+                                   &key, 
+                                   sizeof(terra_type))
         end
     end
-    return terra(key : terra_type)
-        -- TODO: get proper hash_fn for integral/float types
-        return ht_lib.hash_table_hashing_fn(
-                               &key, 
-                               sizeof(terra_type))
-    end
-end
 
-return function(key_type, value_type)
-    local struct key_value_pair {
+    local struct pair_type {
         key : key_type
         value : value_type
     }
 
     local struct hash_node {
-    	pair : key_value_pair
+    	pair : pair_type
         ht_node : ht_lib.hash_node
     }
     
@@ -126,7 +126,7 @@ return function(key_type, value_type)
                                key_hash)
     end
 
-    terra hash_table:get(key : key_type) : &key_value_pair
+    terra hash_table:get(key : key_type) : &pair_type
         var key_hash = key_hash_fn(key)
         var node = [&hash_node](ht_lib.hash_table_get(
                                         &self.ht,
@@ -136,8 +136,16 @@ return function(key_type, value_type)
         if node == nil then
             return nil
         end
-            return &node.pair
-        end
+        return &node.pair
+    end
+
+    terra hash_table:bucket(key : key_type) : &ht_lib.hash_node
+        var key_hash = key_hash_fn(key)
+        var node = [&ht_lib.hash_node](ht_lib.hash_table_bucket(
+                                        &self.ht,
+                                        key_hash))
+        return node
+    end
 
     terra hash_table:del(key : key_type)
         var key_hash = key_hash_fn(key)
@@ -166,12 +174,17 @@ return function(key_type, value_type)
         std.free(instance)
     end
 
+    local terra pair(node : &ht_lib.hash_node)
+        return [&pair_type](node.data)
+    end
+
     return {
         hash_type = hash_table,
-        pair_type = key_value_pair,
+        pair_type = pair_type,
         key_type = key_type,
         value_type = value_type,
         new = new,
-        delete = delete
+        delete = delete,
+        pair = pair
     }
 end

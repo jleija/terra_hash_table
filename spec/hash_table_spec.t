@@ -146,7 +146,26 @@ describe("typical use cases", function()
         assert.is.equal(2, instance:get("x").value)
         instance:del("x")
         assert.is.falsy(instance:get("x"))
-        str_int_map.delete(instance)
+    end)
+
+    it("can iterate through a bucket of repeated key hashes", function()
+        instance:put("x", 1)
+        instance:put("x", 2)
+        instance:put("x", 3)
+        instance:put("x", 4)
+        local iter = instance:bucket("x")
+        assert.is.truthy(iter)
+
+        local v = 1
+        while iter ~= nil do
+            assert.is.equal("x", ffi.string(str_int_map.pair(iter).key))
+            assert.is.equal(v, str_int_map.pair(iter).value)
+            iter = iter.next
+            v = v + 1
+        end
+        for i=1,4 do
+            instance:del("x")
+        end
     end)
 
     it("has same usage in terra and in lua", function()

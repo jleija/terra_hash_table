@@ -26,6 +26,10 @@ void* hash_table_get(
     void* key, 
     uint64_t key_hash);
 
+hash_node* hash_table_bucket(
+    hash_table* ht, 
+    uint64_t key_hash);
+
 void* hash_table_del(
     hash_table* ht, 
     comparison_function compare, 

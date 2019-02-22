@@ -129,3 +129,59 @@ describe("hash table for strings to structs", function()
         assert.is.equal(7, instance:get("my_key").value.y)
     end)
 end)
+
+describe("insertion and removal of elements", function()
+    it("can put and del multiple times with the same key", function()
+        local str_int_map = hash_table(rawstring, int)
+
+        local instance = str_int_map.new()
+
+        instance:put("one", 1)
+        instance:put("one", 1)
+        instance:del("one")
+        assert.is.truthy(instance:get("one"))
+        assert.is.equal(1, instance:get("one").value)
+        instance:del("one")
+        assert.is.falsy(instance:get("one"))
+    end)
+end)
+
+describe("element count", function()
+    it("should return the count of inserted elements", function()
+        local str_int_map = hash_table(rawstring, int)
+
+        local instance = str_int_map.new()
+
+        assert.is.equal(0, instance:size())
+        instance:put("one", 1)
+        assert.is.equal(1, instance:size())
+        instance:put("two", 2)
+        assert.is.equal(2, instance:size())
+        instance:del("one")
+        assert.is.equal(1, instance:size())
+        instance:del("one")
+        assert.is.equal(1, instance:size())
+        instance:del("two")
+        assert.is.equal(0, instance:size())
+        str_int_map.delete(instance)
+    end)
+end)
+
+
+describe("memory usage", function()
+    local str_str_map = hash_table(rawstring, rawstring)
+
+    local instance
+    before_each(function() instance = str_str_map.new() end)
+    after_each(function() str_str_map.delete(instance) end)
+
+    it("should reclaim memory when items are removed", function()
+        local original_bytes = instance:memory_usage()
+        instance:put("one", "uno")
+        assert.is.truthy(instance:memory_usage() > original_bytes)
+        instance:del("one")
+        assert.is.equal(original_bytes, instance:memory_usage())
+    end)
+end)
+
+

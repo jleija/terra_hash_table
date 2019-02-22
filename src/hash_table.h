@@ -7,10 +7,12 @@ typedef tommy_hashlin hash_table;
 typedef tommy_node hash_node;
 
 void hash_table_init(hash_table* ht);
+void hash_table_done(hash_table* ht);
 
 uint64_t hash_table_hashing_fn(void* key, size_t size);
 
 size_t hash_table_size(hash_table* ht);
+size_t hash_table_memory_usage(hash_table* ht);
 
 void hash_table_put(
     hash_table* ht, 

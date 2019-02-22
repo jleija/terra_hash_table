@@ -107,6 +107,10 @@ return function(key_type, value_type)
         return ht_lib.hash_table_size(&self.ht)
     end
 
+    terra hash_table:memory_usage()
+        return ht_lib.hash_table_memory_usage(&self.ht)
+    end
+
     terra hash_table:is_empty() : bool
         return self:size() == 0
     end
@@ -144,8 +148,11 @@ return function(key_type, value_type)
                                         key_hash))
         -- TODO: implement policy where the user owns the memory management
         -- should manual memory management be the default???
-        key_delete_fn(node.pair.key)
-        value_delete_fn(node.pair.value)
+        if node ~= nil then
+            key_delete_fn(node.pair.key)
+            value_delete_fn(node.pair.value)
+            std.free(node)
+        end
     end
 
     local terra new() : &hash_table
@@ -155,6 +162,7 @@ return function(key_type, value_type)
     end
 
     local terra delete(instance : &hash_table) 
+        ht_lib.hash_table_done(&instance.ht)
         std.free(instance)
     end
 

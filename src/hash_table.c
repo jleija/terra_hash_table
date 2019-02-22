@@ -12,9 +12,19 @@ void hash_table_init(hash_table* ht)
   tommy_hashlin_init(ht);
 }
 
+void hash_table_done(hash_table* ht)
+{
+  tommy_hashlin_done(ht);
+}
+
 size_t hash_table_size(hash_table* ht)
 {
   return tommy_hashlin_count(ht);
+}
+
+size_t hash_table_memory_usage(hash_table* ht)
+{
+  return tommy_hashlin_memory_usage(ht);
 }
 
 void hash_table_put( hash_table* ht, hash_node* node, void* obj, uint64_t key_hash)

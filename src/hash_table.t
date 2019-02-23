@@ -18,7 +18,7 @@ local function get_comparison_fn(terra_type)
             return (@[&terra_type](arg)) ^ (@[&terra_type](key))
         end
     end
-    error("unsuported terra type: " .. tostring(terra_type.name))
+    error("unsuported type: " .. tostring(terra_type.name))
 end
 
 local function get_size_fn(terra_type)
@@ -32,13 +32,32 @@ local function get_size_fn(terra_type)
     end
 end
 
+local function load_c_library()
+    local function script_path()
+       local str = debug.getinfo(2, "S").source:sub(2)
+       return str:match("(.*/)")
+    end
+
+    local hash_table_home = script_path():gsub("/src/$", "")
+    local tommyds_path = hash_table_home .. "/external_dependencies/tommyds/tommyds"
+    local hash_table_h = script_path() .. "hash_table.h"
+    local hash_table_so = hash_table_home .. "/bin/hash_table.so"
+
+    terralib.includepath = terralib.includepath .. ";" .. tommyds_path
+    local ht_lib = terralib.includec(hash_table_h)
+    local status, err = pcall(function() terralib.linklibrary(hash_table_so) end)
+
+    if not status then
+        error("Could not load hash_table.so. Make sure to run ./build.sh. Expectincg hash_table.so in " .. hash_table_so .. ":\n" .. err)
+    end
+
+    return ht_lib
+end
+
+local ht_lib = load_c_library()
+
 return function(key_type, value_type, options)
     options = options or {}
-    terralib.includepath = terralib.includepath 
-                           .. ";external_dependencies/tommyds/tommyds"
-
-    local ht_lib = terralib.includec("src/hash_table.h")
-    terralib.linklibrary("bin/hash_table.so")
 
     local alloc_fn = options.alloc_fn or std.malloc
     local dealloc_fn = options.dealloc_fn or std.free
@@ -91,10 +110,6 @@ return function(key_type, value_type, options)
         ht_node : ht_lib.hash_node
     }
     
-    local struct hash_table {
-        ht : ht_lib.hash_table
-    }
-
     local compare_fn = options.compare_fn or get_comparison_fn(key_type)
     local size_fn = options.size_fn or get_size_fn(key_type)
     local key_copy_fn = options.key_copy_fn or get_copy_fn(key_type)
@@ -102,6 +117,10 @@ return function(key_type, value_type, options)
     local value_copy_fn = options.value_copy_fn or get_copy_fn(value_type)
     local value_delete_fn = options.value_delete_fn or get_delete_fn(value_type)
     local key_hash_fn = options.key_hash_fn or get_key_hash_fn(key_type)
+
+    local struct hash_table {
+        ht : ht_lib.hash_table
+    }
 
     terra hash_table:init()
         ht_lib.hash_table_init(&self.ht)

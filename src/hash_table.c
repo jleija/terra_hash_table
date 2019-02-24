@@ -47,3 +47,7 @@ void* hash_table_del( hash_table* ht, comparison_function compare, void* key, ui
   return tommy_hashlin_remove(ht, compare, key, key_hash);
 }
 
+void hash_table_for_each( hash_table* ht, for_each_function fn)
+{
+  tommy_hashlin_foreach(ht, fn);
+}

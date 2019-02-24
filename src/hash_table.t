@@ -118,6 +118,10 @@ return function(key_type, value_type, options)
     local value_delete_fn = options.value_delete_fn or get_delete_fn(value_type)
     local key_hash_fn = options.key_hash_fn or get_key_hash_fn(key_type)
 
+    local terra pair(iter : &opaque) : &pair_type
+        return [&pair_type]([&ht_lib.hash_node](iter).data)
+    end
+
     local struct hash_table {
         ht : ht_lib.hash_table
     }
@@ -170,6 +174,12 @@ return function(key_type, value_type, options)
         return node
     end
 
+    local terra del_node(node : &hash_node)
+        key_delete_fn(node.pair.key)
+        value_delete_fn(node.pair.value)
+        dealloc_fn(node)
+    end
+
     terra hash_table:del(key : key_type)
         var key_hash = key_hash_fn(key)
         var node = [&hash_node](ht_lib.hash_table_del(
@@ -180,10 +190,16 @@ return function(key_type, value_type, options)
         -- TODO: implement policy where the user owns the memory management
         -- should manual memory management be the default???
         if node ~= nil then
-            key_delete_fn(node.pair.key)
-            value_delete_fn(node.pair.value)
-            dealloc_fn(node)
+            del_node(node)
         end
+    end
+
+    terra hash_table:for_each(user_fn : {&opaque} -> {})
+        ht_lib.hash_table_for_each(&self.ht, user_fn)
+    end
+
+    terra hash_table:del_all()
+        self:for_each([{&opaque}->{}](del_node))
     end
 
     local terra new() : &hash_table
@@ -197,15 +213,12 @@ return function(key_type, value_type, options)
         dealloc_fn(instance)
     end
 
-    local terra pair(node : &ht_lib.hash_node)
-        return [&pair_type](node.data)
-    end
-
     return {
         hash_type = hash_table,
         pair_type = pair_type,
         key_type = key_type,
         value_type = value_type,
+        iter_type = ht_lib.hash_node,
         new = new,
         delete = delete,
         pair = pair

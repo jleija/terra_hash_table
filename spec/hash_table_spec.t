@@ -131,11 +131,40 @@ describe("hash table for strings to structs", function()
 end)
 
 describe("typical use cases", function()
-    local str_int_map = hash_table(rawstring, int)
+    local std = terralib.includec("stdlib.h")
+
+    local allocations_count = global(int, 0)
+    local deallocations_count = global(int, 0)
+
+    local terra alloc(n : int)
+        allocations_count = allocations_count + 1
+        return std.malloc(n)
+    end
+
+    local terra dealloc(p : &opaque)
+        deallocations_count = deallocations_count + 1
+        std.free(p)
+    end
+
+    local str_int_map = hash_table(rawstring, int, {
+                                   alloc_fn = alloc,
+                                   dealloc_fn = dealloc
+                                 })
     local instance
 
-    before_each(function() instance = str_int_map.new() end)
-    after_each(function() str_int_map.delete(instance) end)
+    before_each(function() 
+                    allocations_count:set(0)
+                    deallocations_count:set(0)
+                    instance = str_int_map.new() 
+                end)
+    after_each(function() 
+                    str_int_map.delete(instance) 
+                    assert.is.equal(allocations_count:get(),
+                                    deallocations_count:get())
+               end)
+
+--    before_each(function() instance = str_int_map.new() end)
+--    after_each(function() str_int_map.delete(instance) end)
 
     it("can put, get and del multiple times with the same key", function()
         instance:put("x", 1)
@@ -163,9 +192,34 @@ describe("typical use cases", function()
             iter = iter.next
             v = v + 1
         end
-        for i=1,4 do
-            instance:del("x")
+        instance:del_all()
+    end)
+    it("should be able to iterate through all the elements in the hash-table", function()
+        local str = terralib.includec("string.h")
+        local c = terralib.includec("stdio.h")
+
+        instance:put("a", 1)
+        instance:put("a", 2)
+        instance:put("a", 3)
+        instance:put("b", 10)
+        instance:put("b", 20)
+
+        local a_sum = global(int, 0)
+        local b_sum = global(int, 0)
+
+        local terra count_pairs( pair : &str_int_map.pair_type)
+            if str.strcmp("a", pair.key) == 0 then
+                a_sum = a_sum + pair.value
+            else
+                b_sum = b_sum + pair.value
+            end
         end
+        local fn_ptr = count_pairs:compile()
+
+        instance:for_each(fn_ptr)
+        assert.is.equal(6, a_sum:get())
+        assert.is.equal(30, b_sum:get())
+        instance:del_all()
     end)
 
     it("has same usage in terra and in lua", function()
@@ -218,7 +272,7 @@ describe("memory usage, custom allocator", function()
                                    dealloc_fn = dealloc
                                  })
 
-    local instance = str_str_map.new()
+    local instance
 
     before_each(function() 
                     allocations_count:set(0)

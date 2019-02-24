@@ -3,6 +3,7 @@
 
 //typedef int (*comparison_function)(void*, void*);
 typedef tommy_search_func comparison_function;
+typedef tommy_foreach_func for_each_function;
 typedef tommy_hashlin hash_table;
 typedef tommy_node hash_node;
 
@@ -36,3 +37,6 @@ void* hash_table_del(
     void* key, 
     uint64_t key_hash);
 
+void hash_table_for_each(
+    hash_table* ht,
+    for_each_function);

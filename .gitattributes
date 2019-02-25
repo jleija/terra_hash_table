@@ -1,4 +1,3 @@
-
-* linguist-vendored
-*.t linguist-vendored=false
+external_dependencies/* linguist-vendored
+*.t linguist-language=Terra
 

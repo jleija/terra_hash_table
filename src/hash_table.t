@@ -130,8 +130,12 @@ return function(key_type, value_type, options)
         ht_lib.hash_table_init(&self.ht)
     end
 
-    terra hash_table:size()
-        return ht_lib.hash_table_size(&self.ht)
+    terra hash_table:done()
+        ht_lib.hash_table_done(&self.ht)
+    end
+
+    terra hash_table:count()
+        return ht_lib.hash_table_count(&self.ht)
     end
 
     terra hash_table:memory_usage()
@@ -139,23 +143,23 @@ return function(key_type, value_type, options)
     end
 
     terra hash_table:is_empty() : bool
-        return self:size() == 0
+        return self:count() == 0
     end
 
-    terra hash_table:put(key : key_type, value : value_type)
+    terra hash_table:insert(key : key_type, value : value_type)
         var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
         node.pair.key = key_copy_fn(&key)
         node.pair.value = value_copy_fn(&value)
         var key_hash = key_hash_fn(key)
-        ht_lib.hash_table_put( &self.ht, 
+        ht_lib.hash_table_insert( &self.ht, 
                                &node.ht_node, 
                                node, 
                                key_hash)
     end
 
-    terra hash_table:get(key : key_type) : &pair_type
+    terra hash_table:search(key : key_type) : &pair_type
         var key_hash = key_hash_fn(key)
-        var node = [&hash_node](ht_lib.hash_table_get(
+        var node = [&hash_node](ht_lib.hash_table_search(
                                         &self.ht,
                                         compare_fn,
                                         &key,
@@ -180,9 +184,9 @@ return function(key_type, value_type, options)
         dealloc_fn(node)
     end
 
-    terra hash_table:del(key : key_type)
+    terra hash_table:remove(key : key_type)
         var key_hash = key_hash_fn(key)
-        var node = [&hash_node](ht_lib.hash_table_del(
+        var node = [&hash_node](ht_lib.hash_table_remove(
                                         &self.ht,
                                         compare_fn,
                                         &key,
@@ -194,16 +198,16 @@ return function(key_type, value_type, options)
         end
     end
 
-    terra hash_table:for_each(user_fn : {&opaque} -> {})
-        ht_lib.hash_table_for_each(&self.ht, user_fn)
+    terra hash_table:foreach(user_fn : {&opaque} -> {})
+        ht_lib.hash_table_foreach(&self.ht, user_fn)
     end
 
-    terra hash_table:for_each_with_arg(user_fn : {&opaque, &opaque} -> {}, arg : &opaque)
-        ht_lib.hash_table_for_each_with_arg(&self.ht, user_fn, arg)
+    terra hash_table:foreach_arg(user_fn : {&opaque, &opaque} -> {}, arg : &opaque)
+        ht_lib.hash_table_foreach_arg(&self.ht, user_fn, arg)
     end
 
-    terra hash_table:del_all()
-        self:for_each([{&opaque}->{}](del_node))
+    terra hash_table:remove_all()
+        self:foreach([{&opaque}->{}](del_node))
     end
 
     local terra new() : &hash_table
@@ -213,7 +217,7 @@ return function(key_type, value_type, options)
     end
 
     local terra delete(instance : &hash_table) 
-        ht_lib.hash_table_done(&instance.ht)
+        instance:done()
         dealloc_fn(instance)
     end
 

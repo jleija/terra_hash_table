@@ -19,7 +19,7 @@ void test_hash_fn()
   hash_table_hashing_fn(&k, sizeof(k));
 }
 
-void test_put_and_get()
+void test_insert_and_search()
 {
   hash_table ht;
 
@@ -29,18 +29,18 @@ void test_put_and_get()
   obj.key = 3;
   obj.value = 33;
 
-  hash_table_put(&ht, &obj.node, &obj, 3);
+  hash_table_insert(&ht, &obj.node, &obj, 3);
 
-  assert(1 == hash_table_size(&ht));
+  assert(1 == hash_table_count(&ht));
 
   int key = 3;
   
-  object* found_object = (object*)hash_table_get(&ht, int_compare, &key, 3);
+  object* found_object = (object*)hash_table_search(&ht, int_compare, &key, 3);
 
   assert(33 == found_object->value);
 }
 
-void test_put_and_del()
+void test_insert_and_remove()
 {
   hash_table ht;
 
@@ -50,23 +50,23 @@ void test_put_and_del()
   obj.key = 3;
   obj.value = 33;
 
-  hash_table_put(&ht, &obj.node, &obj, 3);
+  hash_table_insert(&ht, &obj.node, &obj, 3);
 
-  assert(1 == hash_table_size(&ht));
+  assert(1 == hash_table_count(&ht));
 
   int key = 3;
   
-  object* found_object = (object*)hash_table_del(&ht, int_compare, &key, 3);
+  object* found_object = (object*)hash_table_remove(&ht, int_compare, &key, 3);
 
   assert(33 == found_object->value);
 
-  found_object = (object*)hash_table_get(&ht, int_compare, &key, 3);
+  found_object = (object*)hash_table_search(&ht, int_compare, &key, 3);
   assert(found_object == NULL);
 }
 
 void main()
 {
-  test_put_and_get();
-  test_put_and_del();
+  test_insert_and_search();
+  test_insert_and_remove();
   test_hash_fn();
 }

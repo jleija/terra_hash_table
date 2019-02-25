@@ -198,6 +198,10 @@ return function(key_type, value_type, options)
         ht_lib.hash_table_for_each(&self.ht, user_fn)
     end
 
+    terra hash_table:for_each_with_arg(user_fn : {&opaque, &opaque} -> {}, arg : &opaque)
+        ht_lib.hash_table_for_each_with_arg(&self.ht, user_fn, arg)
+    end
+
     terra hash_table:del_all()
         self:for_each([{&opaque}->{}](del_node))
     end

@@ -51,3 +51,8 @@ void hash_table_for_each( hash_table* ht, for_each_function fn)
 {
   tommy_hashlin_foreach(ht, fn);
 }
+
+void hash_table_for_each_with_arg( hash_table* ht, for_each_arg_function fn, void* arg)
+{
+  tommy_hashlin_foreach_arg(ht, fn, arg);
+}

@@ -196,7 +196,6 @@ describe("typical use cases", function()
     end)
     it("should be able to iterate through all the elements in the hash-table", function()
         local str = terralib.includec("string.h")
-        local c = terralib.includec("stdio.h")
 
         instance:put("a", 1)
         instance:put("a", 2)
@@ -207,18 +206,52 @@ describe("typical use cases", function()
         local a_sum = global(int, 0)
         local b_sum = global(int, 0)
 
-        local terra count_pairs( pair : &str_int_map.pair_type)
+        local terra sum_pairs( pair : &str_int_map.pair_type)
             if str.strcmp("a", pair.key) == 0 then
                 a_sum = a_sum + pair.value
             else
                 b_sum = b_sum + pair.value
             end
         end
-        local fn_ptr = count_pairs:compile()
+        local fn_ptr = sum_pairs:compile()
 
         instance:for_each(fn_ptr)
         assert.is.equal(6, a_sum:get())
         assert.is.equal(30, b_sum:get())
+        instance:del_all()
+    end)
+
+    it("should be able to iterate through all the elements in the hash-table, passing a user-given argument", function()
+        local str = terralib.includec("string.h")
+
+        instance:put("a", 1)
+        instance:put("a", 2)
+        instance:put("a", 3)
+        instance:put("b", 10)
+        instance:put("b", 20)
+
+        local struct sums {
+            a_sum : int
+            b_sum : int
+        }
+
+        local my_state = global(sums)
+
+        my_state:get().a_sum = 0
+        my_state:get().b_sum = 0
+
+        local terra sum_pairs_in_arg( sum_state : &sums, pair : &str_int_map.pair_type)
+            if str.strcmp("a", pair.key) == 0 then
+                sum_state.a_sum = sum_state.a_sum + pair.value
+            else
+                sum_state.b_sum = sum_state.b_sum + pair.value
+            end
+        end
+        local fn_ptr = sum_pairs_in_arg:compile()
+
+        instance:for_each_with_arg(fn_ptr, my_state:getpointer())
+        assert.is.equal(6, my_state:get().a_sum)
+        assert.is.equal(30, my_state:get().b_sum)
         instance:del_all()
     end)
 

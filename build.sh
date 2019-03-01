@@ -2,9 +2,11 @@
 
 mkdir -p bin
 
-echo "tommyhashlin"
-cc -I external_dependencies/tommyds/tommyds -I src -shared -o bin/tommyhashlin.so -Dtommy_inline=" " external_dependencies/tommyds/tommyds/tommyhashlin.c -Dtommy_inline=static external_dependencies/tommyds/tommyds/tommyhash.c 
+#cc -I external_dependencies/tommyds/tommyds -I src -shared -o bin/tommyhashlin.so -Dtommy_inline=" " external_dependencies/tommyds/tommyds/tommyhashlin.c external_dependencies/tommyds/tommyds/tommyhashtbl.c -Dtommy_inline=static external_dependencies/tommyds/tommyds/tommyhash.c 
+cc -O3 -fPIC -I external_dependencies/tommyds/tommyds -I src -shared -o bin/tommyds.so external_dependencies/tommyds/tommyds/tommyhashdyn.c external_dependencies/tommyds/tommyds/tommyhashlin.c external_dependencies/tommyds/tommyds/tommyhashtbl.c external_dependencies/tommyds/tommyds/tommyhash.c 
 
+#echo "tommyhashtbl"
+#cc -I external_dependencies/tommyds/tommyds -I src -shared -o bin/tommyhashtbl.so -Dtommy_inline=" " external_dependencies/tommyds/tommyds/tommyhashtbl.c -Dtommy_inline=static external_dependencies/tommyds/tommyds/tommyhash.c 
 
 #echo "Wrapper"
 

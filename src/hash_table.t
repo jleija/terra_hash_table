@@ -2,6 +2,12 @@ local std = terralib.includec("stdlib.h")
 local str = terralib.includec("string.h")
 local c = terralib.includec("stdio.h")
 
+local variants = {
+    fixed = "fixed",
+    linear = "linear",
+    dynamic = "dynamic"
+}
+
 local function get_comparison_fn(terra_type)
     if terra_type.name == "rawstring" then
         return terra( a : &opaque, b : &opaque) : int
@@ -63,9 +69,9 @@ local function load_tommyds()
     end
 
     local bindings = {
-        lin = include_tommyds("tommyhashlin.h", "tommy_hashlin"),
-        tbl = include_tommyds("tommyhashtbl.h", "tommy_hashtable"),
-        dyn = include_tommyds("tommyhashdyn.h", "tommy_hashdyn"),
+        linear = include_tommyds("tommyhashlin.h", "tommy_hashlin"),
+        fixed = include_tommyds("tommyhashtbl.h", "tommy_hashtable"),
+        dynamic = include_tommyds("tommyhashdyn.h", "tommy_hashdyn"),
     }
 
     local hash_table_so = hash_table_home .. "/bin/tommyds.so"
@@ -84,9 +90,11 @@ return function(params)
     local key_type = params[1] or error("No key-type argument for hash")
     local value_type = params[2] -- optional: treat as set when not provided
 
-    local flavor = params.flavor or "lin"
+    local variant = params.variant or variants.linear
+    assert(variants[variant], "Invalid variant selection. Select either fixed or linear or dynamic")
+
     local bucket_max = params.bucket_max or 1024
-    local tommyds = tommyds_lib[flavor]
+    local tommyds = tommyds_lib[variant]
 
     local alloc_fn = params.alloc_fn or std.malloc
     local dealloc_fn = params.dealloc_fn or std.free
@@ -175,7 +183,7 @@ return function(params)
         ht : tommyds.hash_table
     }
 
-    if flavor == "tbl" then
+    if variant == variants.fixed then
         terra hash_table:init()
             tommyds.init(&self.ht, bucket_max)
         end
@@ -296,6 +304,7 @@ return function(params)
         iter_type = tommyds.hash_node,
         new = new,
         delete = delete,
-        element = element
+        element = element,
+        variants = variants
     }
 end

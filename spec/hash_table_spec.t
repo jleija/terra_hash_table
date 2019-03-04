@@ -6,7 +6,7 @@ for _, flavor in ipairs(flavors) do
 
     describe("hash table 'class' and instance creation. Flavor=" .. flavor, function()
         it("has new and delete operators to get heap instances", function()
-            local int_int_map = hash_table(int, int, {flavor=flavor})
+            local int_int_map = hash_table{int, int, flavor=flavor}
             local hash_instance = int_int_map.new()
 
             assert.is.truthy(hash_instance)
@@ -15,7 +15,7 @@ for _, flavor in ipairs(flavors) do
             int_int_map.delete(hash_instance)
         end)
         it("can be created as a stack (non-heap) variable", function()
-            local int_int_map = hash_table(int, int, {flavor=flavor})
+            local int_int_map = hash_table{int, int, flavor=flavor}
 
             local my_table = global(int_int_map.hash_type)
 
@@ -26,7 +26,7 @@ for _, flavor in ipairs(flavors) do
     end)
 
     describe("hash table for integral types. Flavor=" .. flavor, function()
-        local int_int_map = hash_table(int, int, {flavor=flavor})
+        local int_int_map = hash_table{int, int, flavor=flavor}
 
         local instance
 
@@ -48,7 +48,7 @@ for _, flavor in ipairs(flavors) do
             assert.is.equal(2, instance:count())
         end)
 
-        it("inserts and removes a key-value pair", function()
+        it("inserts and removes a key-value element", function()
             instance:insert(4, 44)
             assert.is.equal(1, instance:count())
             assert.is.equal(44, instance:search(4).value)
@@ -61,7 +61,7 @@ for _, flavor in ipairs(flavors) do
 
 
     describe("hash table for null-terminated strings. Flavor=" .. flavor, function()
-        local str_str_map = hash_table(rawstring, rawstring, {flavor=flavor})
+        local str_str_map = hash_table{rawstring, rawstring, flavor=flavor}
         local my_table = global(str_str_map.hash_type)
 
         local terra instance()
@@ -85,7 +85,7 @@ for _, flavor in ipairs(flavors) do
             x : int
             y : int
         }
-        local point_point_map = hash_table(point, point, {flavor=flavor})
+        local point_point_map = hash_table{point, point, flavor=flavor}
         local instance
 
         before_each(function() instance = point_point_map.new() end)
@@ -115,7 +115,7 @@ for _, flavor in ipairs(flavors) do
             x : int
             y : int
         }
-        local str_point_map = hash_table(rawstring, point, {flavor=flavor})
+        local str_point_map = hash_table{rawstring, point, flavor=flavor}
 
         local instance
 
@@ -135,7 +135,21 @@ for _, flavor in ipairs(flavors) do
         end)
     end)
 
-    describe("typical use cases. Flavor=" .. flavor, function()
+    describe("hash set use cases. create set type with only key type. Flavor=" .. flavor, function()
+        -- declaration for set only requires the key-type parameter
+        local int_set = hash_table{int, flavor=flavor}
+        local instance
+
+        before_each(function() instance = int_set.new() end)
+        after_each(function() int_set.delete(instance) end)
+
+        it("can create a set hash by providing only the key-type", function()
+            instance:insert(5)
+            assert.is.truthy(instance:search(5))
+            assert.is.falsy(instance:search(4))
+        end)
+    end)
+    describe("typical hash table use cases. Flavor=" .. flavor, function()
         local std = terralib.includec("stdlib.h")
 
         local allocations_count = global(int, 0)
@@ -151,11 +165,11 @@ for _, flavor in ipairs(flavors) do
             std.free(p)
         end
 
-        local str_int_map = hash_table(rawstring, int, {
+        local str_int_map = hash_table{rawstring, int, 
                                        flavor = flavor,
                                        alloc_fn = alloc,
                                        dealloc_fn = dealloc
-                                     })
+                                     }
         local instance
 
         before_each(function() 
@@ -193,8 +207,8 @@ for _, flavor in ipairs(flavors) do
 
             local v = 1
             while iter ~= nil do
-                assert.is.equal("x", ffi.string(str_int_map.pair(iter).key))
-                assert.is.equal(v, str_int_map.pair(iter).value)
+                assert.is.equal("x", ffi.string(str_int_map.element(iter).key))
+                assert.is.equal(v, str_int_map.element(iter).value)
                 iter = iter.next
                 v = v + 1
             end
@@ -212,14 +226,14 @@ for _, flavor in ipairs(flavors) do
             local a_sum = global(int, 0)
             local b_sum = global(int, 0)
 
-            local terra sum_pairs( pair : &str_int_map.pair_type)
-                if str.strcmp("a", pair.key) == 0 then
-                    a_sum = a_sum + pair.value
+            local terra sum_elements( element : &str_int_map.element_type)
+                if str.strcmp("a", element.key) == 0 then
+                    a_sum = a_sum + element.value
                 else
-                    b_sum = b_sum + pair.value
+                    b_sum = b_sum + element.value
                 end
             end
-            local fn_ptr = sum_pairs:compile()
+            local fn_ptr = sum_elements:compile()
 
             instance:foreach(fn_ptr)
             assert.is.equal(6, a_sum:get())
@@ -246,14 +260,14 @@ for _, flavor in ipairs(flavors) do
             my_state:get().a_sum = 0
             my_state:get().b_sum = 0
 
-            local terra sum_pairs_in_arg( sum_state : &sums, pair : &str_int_map.pair_type)
-                if str.strcmp("a", pair.key) == 0 then
-                    sum_state.a_sum = sum_state.a_sum + pair.value
+            local terra sum_elements_in_arg( sum_state : &sums, element : &str_int_map.element_type)
+                if str.strcmp("a", element.key) == 0 then
+                    sum_state.a_sum = sum_state.a_sum + element.value
                 else
-                    sum_state.b_sum = sum_state.b_sum + pair.value
+                    sum_state.b_sum = sum_state.b_sum + element.value
                 end
             end
-            local fn_ptr = sum_pairs_in_arg:compile()
+            local fn_ptr = sum_elements_in_arg:compile()
 
             instance:foreach_arg(fn_ptr, my_state:getpointer())
             assert.is.equal(6, my_state:get().a_sum)
@@ -306,11 +320,11 @@ for _, flavor in ipairs(flavors) do
             std.free(p)
         end
 
-        local str_str_map = hash_table(rawstring, rawstring, {
+        local str_str_map = hash_table{rawstring, rawstring, 
                                        flavor = flavor,
                                        alloc_fn = alloc,
                                        dealloc_fn = dealloc
-                                     })
+                                     }
 
         local instance
 

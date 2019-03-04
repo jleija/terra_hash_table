@@ -80,14 +80,16 @@ end
 
 local tommyds_lib = load_tommyds()
 
-return function(key_type, value_type, options)
-    options = options or {}
-    local flavor = options.flavor or "lin"
-    local bucket_max = options.bucket_max or 1024
+return function(params)
+    local key_type = params[1] or error("No key-type argument for hash")
+    local value_type = params[2] -- optional: treat as set when not provided
+
+    local flavor = params.flavor or "lin"
+    local bucket_max = params.bucket_max or 1024
     local tommyds = tommyds_lib[flavor]
 
-    local alloc_fn = options.alloc_fn or std.malloc
-    local dealloc_fn = options.dealloc_fn or std.free
+    local alloc_fn = params.alloc_fn or std.malloc
+    local dealloc_fn = params.dealloc_fn or std.free
 
     local function get_copy_fn(terra_type)
         if terra_type.name == "rawstring" then
@@ -129,26 +131,44 @@ return function(key_type, value_type, options)
         end
     end
 
-    local struct pair_type {
-        key : key_type
-        value : value_type
-    }
+    local element_type
+    if value_type then
+        element_type = struct {
+            key : key_type
+            value : value_type
+        }
+    else
+        element_type = struct {
+            key : key_type
+        }
+    end
 
     local struct hash_node {
-    	pair : pair_type
+    	element : element_type
         ht_node : tommyds.hash_node
     }
     
-    local compare_fn = options.compare_fn or get_comparison_fn(key_type)
-    local size_fn = options.size_fn or get_size_fn(key_type)
-    local key_copy_fn = options.key_copy_fn or get_copy_fn(key_type)
-    local key_delete_fn = options.key_delete_fn or get_delete_fn(key_type)
-    local value_copy_fn = options.value_copy_fn or get_copy_fn(value_type)
-    local value_delete_fn = options.value_delete_fn or get_delete_fn(value_type)
-    local key_hash_fn = options.key_hash_fn or get_key_hash_fn(key_type)
+    local compare_fn = params.compare_fn or get_comparison_fn(key_type)
+    local size_fn = params.size_fn or get_size_fn(key_type)
+    local key_copy_fn = params.key_copy_fn or get_copy_fn(key_type)
+    local key_delete_fn = params.key_delete_fn or get_delete_fn(key_type)
 
-    local terra pair(iter : &opaque) : &pair_type
-        return [&pair_type]([&tommyds.hash_node](iter).data)
+    local value_copy_fn
+    local value_delete_code
+    if value_type then
+        value_copy_fn = params.value_copy_fn or get_copy_fn(value_type)
+        local value_delete_fn = params.value_delete_fn or get_delete_fn(value_type)
+        value_delete_code = function(node)
+                                return quote value_delete_fn(node.element.value) end
+                             end
+    else
+        value_delete_code = function() return quote end end
+    end
+
+    local key_hash_fn = params.key_hash_fn or get_key_hash_fn(key_type)
+
+    local terra element(iter : &opaque) : &element_type
+        return [&element_type]([&tommyds.hash_node](iter).data)
     end
 
     local struct hash_table {
@@ -181,18 +201,30 @@ return function(key_type, value_type, options)
         return self:count() == 0
     end
 
-    terra hash_table:insert(key : key_type, value : value_type)
-        var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
-        node.pair.key = key_copy_fn(&key)
-        node.pair.value = value_copy_fn(&value)
-        var key_hash = key_hash_fn(key)
-        tommyds.insert( &self.ht, 
-                               &node.ht_node, 
-                               node, 
-                               key_hash)
+    if value_type then
+        terra hash_table:insert(key : key_type, value : value_type)
+            var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
+            node.element.key = key_copy_fn(&key)
+            node.element.value = value_copy_fn(&value)
+            var key_hash = key_hash_fn(key)
+            tommyds.insert( &self.ht, 
+                                   &node.ht_node, 
+                                   node, 
+                                   key_hash)
+        end
+    else
+        terra hash_table:insert(key : key_type)
+            var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
+            node.element.key = key_copy_fn(&key)
+            var key_hash = key_hash_fn(key)
+            tommyds.insert( &self.ht, 
+                                   &node.ht_node, 
+                                   node, 
+                                   key_hash)
+        end
     end
 
-    terra hash_table:search(key : key_type) : &pair_type
+    terra hash_table:search(key : key_type) : &element_type
         var key_hash = key_hash_fn(key)
         var node = [&hash_node](tommyds.search(
                                         &self.ht,
@@ -202,7 +234,7 @@ return function(key_type, value_type, options)
         if node == nil then
             return nil
         end
-        return &node.pair
+        return &node.element
     end
 
     terra hash_table:bucket(key : key_type) : &tommyds.hash_node
@@ -214,8 +246,8 @@ return function(key_type, value_type, options)
     end
 
     local terra del_node(node : &hash_node)
-        key_delete_fn(node.pair.key)
-        value_delete_fn(node.pair.value)
+        key_delete_fn(node.element.key)
+        [ value_delete_code(node) ]
         dealloc_fn(node)
     end
 
@@ -258,12 +290,12 @@ return function(key_type, value_type, options)
 
     return {
         hash_type = hash_table,
-        pair_type = pair_type,
+        element_type = element_type,
         key_type = key_type,
         value_type = value_type,
         iter_type = tommyds.hash_node,
         new = new,
         delete = delete,
-        pair = pair
+        element = element
     }
 end

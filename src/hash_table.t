@@ -101,14 +101,17 @@ return function(params)
 
     local function get_copy_fn(terra_type)
         if terra_type.name == "rawstring" then
-            return terra(value : &terra_type)
-                var copy : terra_type = [terra_type](alloc_fn(str.strlen(@value) + 1))
-                str.strcpy(copy, @value)
-                return copy
+            return terra(target : &terra_type, value : &terra_type)
+                -- TODO: actually should only allocate when the new value is bigger
+                -- than the existing value, but to do that, we would need to
+                -- keep the allocated size somewhere here, without interfering
+                -- with a basic string usage/interface
+                @target = [terra_type](alloc_fn(str.strlen(@value) + 1))
+                str.strcpy(@target, @value)
             end
         end
-        return terra(v : &terra_type)
-            return @v
+        return terra(target : &terra_type, v : &terra_type)
+            str.memcpy(target, v, sizeof(terra_type))
         end
     end
 
@@ -212,8 +215,8 @@ return function(params)
     if value_type then
         terra hash_table:insert(key : key_type, value : value_type)
             var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
-            node.element.key = key_copy_fn(&key)
-            node.element.value = value_copy_fn(&value)
+            key_copy_fn(&node.element.key, &key)
+            value_copy_fn(&node.element.value, &value)
             var key_hash = key_hash_fn(key)
             tommyds.insert( &self.ht, 
                                    &node.ht_node, 
@@ -223,7 +226,7 @@ return function(params)
     else
         terra hash_table:insert(key : key_type)
             var node : &hash_node = [&hash_node](alloc_fn(sizeof(hash_node)))
-            node.element.key = key_copy_fn(&key)
+            key_copy_fn(&node.element.key, &key)
             var key_hash = key_hash_fn(key)
             tommyds.insert( &self.ht, 
                                    &node.ht_node, 
